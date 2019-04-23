@@ -110,9 +110,10 @@ public class App {
             + "    if (primArray[N] != EXPECTED) { throw new Error('wrong prime found: '+primArray[N]); }\n"
             + "}\n";
 
-    private static final Context CONTEXT = Context.create();
+    private static final Context CONTEXT;
     static {
         try {
+            CONTEXT = Context.newBuilder().allowExperimentalOptions(true).build();
             System.out.println("warming up ...");
             Field implField = Context.class.getDeclaredField("impl");
             implField.setAccessible(true);
