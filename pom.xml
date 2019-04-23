@@ -277,7 +277,7 @@
                 </executions>
                 <configuration>
                     <mainClass>com.mycompany.app.App</mainClass>
-                    <buildArgs>--language:js</buildArgs>
+                    <buildArgs>--no-fallback --language:js</buildArgs>
                 </configuration>
             </plugin>
         </plugins>

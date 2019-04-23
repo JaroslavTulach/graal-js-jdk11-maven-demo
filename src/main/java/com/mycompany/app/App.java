@@ -120,27 +120,25 @@ public class App {
             Object impl = implField.get(CONTEXT);
             Field threadsField = impl.getClass().getDeclaredField("threads");
             threadsField.setAccessible(true);
-            Field currentThreadInfoField = impl.getClass().getDeclaredField("currentThreadInfo");
-            currentThreadInfoField.setAccessible(true);
-            Field constantThreadInfoField = impl.getClass().getDeclaredField("constantCurrentThreadInfo");
-            constantThreadInfoField.setAccessible(true);
 
-            Object nullInfo = constantThreadInfoField.get(impl);
-
-            CONTEXT.enter();
             CONTEXT.eval(Source.newBuilder("js", SOURCE, "src.js").buildLiteral());
             Value primesMain = CONTEXT.getBindings("js").getMember("primesMain");
             for (int i = 0; i < WARMUP; i++) {
                 primesMain.execute();
             }
-            CONTEXT.leave();
+
             Map<?,?> threads = (Map<?,?>) threadsField.get(impl);
             System.err.println("cleaning " + threads);
+            Object info = threads.values().iterator().next();
+            Field threadField = info.getClass().getDeclaredField("thread");
+            threadField.setAccessible(true);
+            threadField.set(info, null);
             threads.clear();
-            constantThreadInfoField.set(impl, nullInfo);
-            currentThreadInfoField.set(impl, nullInfo);
+            System.err.println("cleaned " + threads);
+
             System.out.println("warmup finished");
-        } catch (NoSuchFieldException | IllegalArgumentException | IllegalAccessException ex) {
+        } catch (Exception ex) {
+            ex.printStackTrace();
             throw new IllegalStateException(ex);
         }
     }
