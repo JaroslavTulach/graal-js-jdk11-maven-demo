@@ -263,6 +263,23 @@
                     </arguments>
                 </configuration>
             </plugin>
+            <plugin>
+                <groupId>com.oracle.substratevm</groupId>
+                <artifactId>native-image-maven-plugin</artifactId>
+                <version>${graalvm.version}</version>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>native-image</goal>
+                        </goals>
+                        <phase>package</phase>
+                    </execution>
+                </executions>
+                <configuration>
+                    <mainClass>com.mycompany.app.App</mainClass>
+                    <buildArgs>--language:js</buildArgs>
+                </configuration>
+            </plugin>
         </plugins>
     </build>
     <dependencies>

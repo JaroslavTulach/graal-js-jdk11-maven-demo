@@ -42,10 +42,9 @@ package com.mycompany.app;
 
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Value;
-import javax.script.ScriptEngineManager;
-import javax.script.ScriptEngine;
-import javax.script.Invocable;
 import java.io.IOException;
+import java.lang.reflect.Field;
+import java.util.Map;
 import org.graalvm.polyglot.Source;
 
 /**
@@ -111,73 +110,55 @@ public class App {
             + "    if (primArray[N] != EXPECTED) { throw new Error('wrong prime found: '+primArray[N]); }\n"
             + "}\n";
 
+    private static final Context CONTEXT = Context.create();
+    static {
+        try {
+            System.out.println("warming up ...");
+            Field implField = Context.class.getDeclaredField("impl");
+            implField.setAccessible(true);
+            Object impl = implField.get(CONTEXT);
+            Field threadsField = impl.getClass().getDeclaredField("threads");
+            threadsField.setAccessible(true);
+            Field currentThreadInfoField = impl.getClass().getDeclaredField("currentThreadInfo");
+            currentThreadInfoField.setAccessible(true);
+            Field constantThreadInfoField = impl.getClass().getDeclaredField("constantCurrentThreadInfo");
+            constantThreadInfoField.setAccessible(true);
+
+            Object nullInfo = constantThreadInfoField.get(impl);
+
+            CONTEXT.enter();
+            CONTEXT.eval(Source.newBuilder("js", SOURCE, "src.js").buildLiteral());
+            Value primesMain = CONTEXT.getBindings("js").getMember("primesMain");
+            for (int i = 0; i < WARMUP; i++) {
+                primesMain.execute();
+            }
+            CONTEXT.leave();
+            Map<?,?> threads = (Map<?,?>) threadsField.get(impl);
+            System.err.println("cleaning " + threads);
+            threads.clear();
+            constantThreadInfoField.set(impl, nullInfo);
+            currentThreadInfoField.set(impl, nullInfo);
+            System.out.println("warmup finished");
+        } catch (NoSuchFieldException | IllegalArgumentException | IllegalAccessException ex) {
+            throw new IllegalStateException(ex);
+        }
+    }
+
+
     public static void main(String[] args) throws Exception {
         benchGraalPolyglotContext();
-        benchGraalScriptEngine();
-        benchNashornScriptEngine();
     }
 
     static long benchGraalPolyglotContext() throws IOException {
         System.out.println("=== Graal.js via org.graalvm.polyglot.Context === ");
         long took = 0;
-        try (Context context = Context.create()) {
-            context.eval(Source.newBuilder("js", SOURCE, "src.js").build());
-            Value primesMain = context.getBindings("js").getMember("primesMain");
-            System.out.println("warming up ...");
-            for (int i = 0; i < WARMUP; i++) {
-                primesMain.execute();
-            }
-            System.out.println("warmup finished, now measuring");
-            for (int i = 0; i < ITERATIONS; i++) {
-                long start = System.currentTimeMillis();
-                primesMain.execute();
-                took = System.currentTimeMillis() - start;
-                System.out.println("iteration: " + took);
-            }
-        } // context.close() is automatic
-        return took;
-    }
-
-    static long benchNashornScriptEngine() throws IOException {
-        System.out.println("=== Nashorn via javax.script.ScriptEngine ===");
-        ScriptEngine nashornEngine = new ScriptEngineManager().getEngineByName("nashorn");
-        if (nashornEngine == null) {
-            System.out.println("*** Nashorn not found ***");
-            return 0;
-        } else {
-            return benchScriptEngineIntl(nashornEngine);
-        }
-    }
-
-    static long benchGraalScriptEngine() throws IOException {
-        System.out.println("=== Graal.js via javax.script.ScriptEngine ===");
-        ScriptEngine graaljsEngine = new ScriptEngineManager().getEngineByName("graal.js");
-        if (graaljsEngine == null) {
-            System.out.println("*** Graal.js not found ***");
-            return 0;
-        } else {
-            return benchScriptEngineIntl(graaljsEngine);
-        }
-    }
-
-    private static long benchScriptEngineIntl(ScriptEngine eng) throws IOException {
-        long took = 0L;
-        try {
-            eng.eval(SOURCE);
-            Invocable inv = (Invocable) eng;
-            System.out.println("warming up ...");
-            for (int i = 0; i < WARMUP; i++) {
-                inv.invokeFunction("primesMain");
-            }
-            System.out.println("warmup finished, now measuring");
-            for (int i = 0; i < ITERATIONS; i++) {
-                long start = System.currentTimeMillis();
-                inv.invokeFunction("primesMain");
-                took = System.currentTimeMillis() - start;
-                System.out.println("iteration: " + (took));
-            }
-        } catch (Exception ex) {
-            System.out.println(ex);
+        CONTEXT.enter();
+        Value primesMain = CONTEXT.getBindings("js").getMember("primesMain");
+        for (int i = 0; i < ITERATIONS; i++) {
+            long start = System.currentTimeMillis();
+            primesMain.execute();
+            took = System.currentTimeMillis() - start;
+            System.out.println("iteration: " + took);
         }
         return took;
     }
